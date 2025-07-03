@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:https": "next dev --turbopack --experimental-https",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "server": "cd server && npm install && npm run dev",
-    "server:start": "cd server && npm start"
+    "server:start": "cd server && npm start",
+    "generate-cert": "node scripts/generate-cert.js"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

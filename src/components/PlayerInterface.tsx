@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '@/context/GameContext';
 import QRScanner from './QRScanner';
+import ManualQRInput from './ManualQRInput';
 import { ScanResult, QRTagType } from '@/types/game';
 
 export default function PlayerInterface() {
@@ -10,6 +11,7 @@ export default function PlayerInterface() {
   const [isScannerActive, setIsScannerActive] = useState(true);
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);
   const [showShop, setShowShop] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
 
   if (!currentPlayer || !currentLobby) {
     return (
@@ -81,14 +83,40 @@ export default function PlayerInterface() {
             <span className="text-sm text-gray-400">Weapon: </span>
             <span className="font-bold">{currentPlayer.weapons[0]?.name || 'None'}</span>
           </div>
-          <button
-            onClick={() => setShowShop(!showShop)}
-            className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
-          >
-            Shop
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowShop(!showShop)}
+              className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
+            >
+              Shop
+            </button>
+            <button
+              onClick={() => setShowManualInput(!showManualInput)}
+              className="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-sm"
+            >
+              Manual
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Manual QR Input overlay */}
+      {showManualInput && (
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Manual QR Input</h2>
+              <button
+                onClick={() => setShowManualInput(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <ManualQRInput onScan={handleQRScan} />
+          </div>
+        </div>
+      )}
 
       {/* Shop overlay */}
       {showShop && (

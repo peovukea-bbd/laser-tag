@@ -16,17 +16,22 @@ export default function QRScanner({ onScan, isActive, className = '' }: QRScanne
   const [hasCamera, setHasCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   useEffect(() => {
     if (!videoRef.current) return;
 
     const initScanner = async () => {
       try {
+        console.log('Initializing QR Scanner...');
+
         // Check if camera is available
         const hasCamera = await QrScanner.hasCamera();
+        console.log('Camera available:', hasCamera);
         setHasCamera(hasCamera);
 
         if (!hasCamera) {
+          console.error('No camera found on this device');
           setError('No camera found on this device');
           return;
         }
@@ -97,19 +102,92 @@ export default function QRScanner({ onScan, isActive, className = '' }: QRScanne
     if (!scannerRef.current) return;
 
     if (isActive && hasCamera) {
+      console.log('Starting camera...');
       scannerRef.current.start().then(() => {
+        console.log('Camera started successfully');
         setIsScanning(true);
         setError(null);
       }).catch((err) => {
         console.error('Failed to start scanner:', err);
-        setError('Failed to start camera');
+        setError(`Failed to start camera: ${err.message}`);
         setIsScanning(false);
       });
     } else {
+      console.log('Stopping camera...');
       scannerRef.current.stop();
       setIsScanning(false);
     }
   }, [isActive, hasCamera]);
+
+  const checkCameraSupport = () => {
+    // Check if we're in a secure context (HTTPS or localhost)
+    const isSecureContext = window.isSecureContext ||
+                           location.protocol === 'https:' ||
+                           location.hostname === 'localhost' ||
+                           location.hostname === '127.0.0.1';
+
+    // Check if mediaDevices API is available
+    const hasMediaDevices = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+
+    return { isSecureContext, hasMediaDevices };
+  };
+
+  const requestCameraPermission = async () => {
+    try {
+      console.log('Requesting camera permission...');
+      setPermissionRequested(true);
+
+      const { isSecureContext, hasMediaDevices } = checkCameraSupport();
+
+      if (!isSecureContext) {
+        throw new Error('Camera access requires HTTPS or localhost. Current protocol: ' + location.protocol);
+      }
+
+      if (!hasMediaDevices) {
+        throw new Error('Camera API not supported on this browser/device');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment' // Try to use back camera
+        }
+      });
+
+      console.log('Camera permission granted');
+
+      // Stop the stream immediately, we just wanted permission
+      stream.getTracks().forEach(track => track.stop());
+
+      // Reinitialize scanner
+      if (videoRef.current) {
+        const initScanner = async () => {
+          try {
+            const hasCamera = await QrScanner.hasCamera();
+            setHasCamera(hasCamera);
+            setError(null);
+          } catch (err) {
+            console.error('Failed to reinitialize scanner:', err);
+            setError('Failed to access camera');
+          }
+        };
+        initScanner();
+      }
+    } catch (err) {
+      console.error('Camera permission denied:', err);
+      const { isSecureContext, hasMediaDevices } = checkCameraSupport();
+
+      let errorMessage = 'Camera access failed: ';
+      if (!isSecureContext) {
+        errorMessage += 'HTTPS required for camera access on mobile devices';
+      } else if (!hasMediaDevices) {
+        errorMessage += 'Camera API not supported on this browser';
+      } else {
+        errorMessage += err.message || 'Permission denied';
+      }
+
+      setError(errorMessage);
+    }
+  };
 
   const playBeepSound = () => {
     // Create a simple beep sound using Web Audio API
@@ -145,12 +223,35 @@ export default function QRScanner({ onScan, isActive, className = '' }: QRScanne
     );
   }
 
-  if (!hasCamera) {
+  if (!hasCamera && !permissionRequested) {
     return (
       <div className={`flex items-center justify-center bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded ${className}`}>
         <div className="text-center">
-          <p className="font-bold">No Camera</p>
-          <p className="text-sm">This device doesn't have a camera</p>
+          <p className="font-bold">Camera Access Needed</p>
+          <p className="text-sm mb-3">Grant camera permission to scan QR codes</p>
+          <button
+            onClick={requestCameraPermission}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold"
+          >
+            📷 Enable Camera
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasCamera) {
+    return (
+      <div className={`flex items-center justify-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded ${className}`}>
+        <div className="text-center">
+          <p className="font-bold">No Camera Available</p>
+          <p className="text-sm">This device doesn't have a camera or permission was denied</p>
+          <button
+            onClick={requestCameraPermission}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold mt-2"
+          >
+            🔄 Try Again
+          </button>
         </div>
       </div>
     );
